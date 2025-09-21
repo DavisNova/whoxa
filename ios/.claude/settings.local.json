@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(pod install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

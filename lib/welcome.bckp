@@ -1,0 +1,1174 @@
+// // ignore_for_file: avoid_print
+// import 'package:flutter/material.dart';
+// import 'package:get/get.dart';
+// import 'package:whoxachat/app.dart';
+// import 'package:whoxachat/src/global/global.dart';
+// import 'package:whoxachat/src/global/strings.dart';
+// import 'package:whoxachat/src/screens/layout/bottombar.dart';
+// import 'package:whoxachat/src/screens/user/FinalLogin.dart';
+// import 'package:permission_handler/permission_handler.dart';
+// import 'dart:io' show Platform;
+// import 'dart:async'; // For handling delayed permission requests
+// import 'package:hive/hive.dart';
+
+// class Welcome extends StatefulWidget {
+//   final bool fromAppScreen;
+//   const Welcome({super.key, this.fromAppScreen = false});
+
+//   @override
+//   State<Welcome> createState() => _WelcomeState();
+// }
+
+// class _WelcomeState extends State<Welcome> {
+//   bool _requestingPermission = false;
+//   int _currentPermissionIndex = 0;
+//   bool _showPermissionDialog = false;
+//   bool _continuePressed = false;
+//   bool _permissionRequestComplete = false;
+//   bool _permissionsInitialized = false;
+
+//   // Flag to prevent automatic permission requests on iOS
+//   bool _userInitiatedPermissionRequest = false;
+
+//   // Track which permissions have already been granted
+//   Map<Permission, bool> _permissionsGranted = {};
+//   late List<Map<String, dynamic>> _permissions;
+
+//   // // List of permissions with friendly descriptions
+//   // final List<Map<String, dynamic>> _permissions = [
+//   //   {
+//   //     'permission': Permission.notification,
+//   //     'title': 'Notifications',
+//   //     'description':
+//   //         'Allow notifications to stay updated with new messages and important alerts.',
+//   //   },
+//   //   {
+//   //     'permission': Permission.location,
+//   //     'title': 'Location',
+//   //     'description':
+//   //         'Share your location for location-based features and nearby friend suggestions.',
+//   //   },
+//   //   {
+//   //     'permission': Permission.camera,
+//   //     'title': 'Camera',
+//   //     'description':
+//   //         'Access your camera to take photos and make video calls with friends.',
+//   //   },
+//   //   {
+//   //     'permission': Permission.microphone,
+//   //     'title': 'Microphone',
+//   //     'description': 'Use your microphone for voice messages and audio calls.',
+//   //   },
+//   //   {
+//   //     'permission': Permission.storage,
+//   //     'title': 'Storage',
+//   //     'description':
+//   //         'Access storage to save photos and videos shared in chats.',
+//   //   },
+//   //   // For iOS, we need to separate photos permission handling
+//   //   {
+//   //     'permission': Permission.photos,
+//   //     'title': 'Photos',
+//   //     'description': 'Share photos from your gallery with friends and family.',
+//   //   },
+//   //   {
+//   //     'permission': Permission.contacts,
+//   //     'title': 'Contacts',
+//   //     'description':
+//   //         'Find friends who are already using the app and connect easily.',
+//   //   },
+//   // ];
+
+//   // Initialize permissions list based on platform
+//   void _initPermissionsList() {
+//     // Base permissions for all platforms
+//     _permissions = [
+//       {
+//         'permission': Permission.notification,
+//         'title': 'Notifications',
+//         'description':
+//             'Allow notifications to stay updated with new messages and important alerts.',
+//       },
+//       {
+//         'permission': Permission.location,
+//         'title': 'Location',
+//         'description':
+//             'Share your location for location-based features and nearby friend suggestions.',
+//       },
+//       {
+//         'permission': Permission.camera,
+//         'title': 'Camera',
+//         'description':
+//             'Access your camera to take photos and make video calls with friends.',
+//       },
+//       {
+//         'permission': Permission.microphone,
+//         'title': 'Microphone',
+//         'description':
+//             'Use your microphone for voice messages and audio calls.',
+//       },
+//       {
+//         'permission': Permission.contacts,
+//         'title': 'Contacts',
+//         'description':
+//             'Find friends who are already using the app and connect easily.',
+//       },
+//     ];
+
+//     // Add platform-specific permissions
+//     if (Platform.isIOS) {
+//       // Add Photos permission only for iOS
+//       _permissions.add({
+//         'permission': Permission.photos,
+//         'title': 'Photos',
+//         'description':
+//             'Share photos from your gallery with friends and family.',
+//       });
+//     }
+//     // else if (Platform.isAndroid) {
+//     //   // For Android, we use storage permission instead of photos
+//     //   _permissions.add({
+//     //     'permission': Permission.storage,
+//     //     'title': 'Storage',
+//     //     'description':
+//     //         'Access storage to save and share photos and videos in chats.',
+//     //   });
+//     // }
+//     // For Android 11+ use more specific permissions instead of broad storage permission
+//     // if (Platform.isAndroid && int.parse(Platform.version.split('.')[0]) >= 30) {
+//     //   // Use specific media permissions instead
+//     //   _permissions.add({
+//     //     'permission': Permission.manageExternalStorage,
+//     //     'title': 'Media Access',
+//     //     'description': 'Access to save photos and videos shared in chats.',
+//     //   });
+//     // } else if (Platform.isAndroid) {
+//     //   // For older Android, use storage permission
+//     //   _permissions.add({
+//     //     'permission': Permission.storage,
+//     //     'title': 'Storage',
+//     //     'description':
+//     //         'Access storage to save and share photos and videos in chats.',
+//     //   });
+//     // }
+//   }
+
+//   @override
+//   void initState() {
+//     super.initState();
+
+//     // Initialize permissions list based on platform
+//     _initPermissionsList();
+
+//     // Make sure permission check is complete before proceeding with the flow
+//     _checkAllPermissionsStatus().then((_) {
+//       setState(() {
+//         _permissionsInitialized = true;
+//       });
+
+//       // If coming from AppScreen, automatically start permission flow
+//       if (widget.fromAppScreen && mounted) {
+//         // Use a short delay to allow the screen to render first
+//         Future.delayed(Duration(milliseconds: 300), () {
+//           _startPermissionFlow();
+//         });
+//       }
+//     });
+//   }
+
+//   // This method checks the photo permission specifically which is often problematic
+//   // Future<bool> _checkPhotoPermission() async {
+//   //   // On iOS, photos permission has different statuses
+//   //   if (Platform.isIOS) {
+//   //     // Check for limited, added, or full access
+//   //     var status = await Permission.photos.status;
+//   //     return status.isGranted || status.isLimited;
+//   //   } else {
+//   //     // On Android, use the standard check
+//   //     var status = await Permission.photos.status;
+//   //     return status.isGranted;
+//   //   }
+//   // }
+
+//   Future<bool> _checkPhotoPermission() async {
+//     try {
+//       // On iOS, photos permission has different statuses
+//       if (Platform.isIOS) {
+//         // Check for limited, added, or full access
+//         var status = await Permission.photos.status;
+//         return status.isGranted || status.isLimited;
+//       } else if (Platform.isAndroid) {
+//         // On Android, we'll only use storage permission
+//         var storageStatus = await Permission.storage.status;
+//         return storageStatus.isGranted;
+//       }
+//       return false;
+//     } catch (e) {
+//       print("Error checking photo permission: $e");
+//       return false;
+//     }
+//   }
+
+//   // Check the status of all permissions and store results
+//   Future<void> _checkAllPermissionsStatus() async {
+//     print("Checking permission status for all permissions...");
+
+//     for (var permissionData in _permissions) {
+//       final permission = permissionData['permission'] as Permission;
+
+//       // Special handling for photos permission
+//       if (permission == Permission.photos) {
+//         final isPhotoGranted = await _checkPhotoPermission();
+//         _permissionsGranted[permission] = isPhotoGranted;
+//         print("Photos permission status: $isPhotoGranted (special check)");
+//       } else {
+//         // Standard permission check for other permissions
+//         final status = await permission.status;
+//         _permissionsGranted[permission] = status.isGranted;
+//         print(
+//             "Permission ${permission.toString()} status: ${status.isGranted}");
+//       }
+//     }
+
+//     // Log all permission statuses for debugging
+//     _permissionsGranted.forEach((permission, isGranted) {
+//       print("Permission check result: ${permission.toString()} = $isGranted");
+//     });
+
+//     // If we're called from AppScreen, we might need to update UI
+//     if (widget.fromAppScreen && mounted) {
+//       setState(() {});
+//     }
+//   }
+
+//   // Save that we've gone through permissions
+//   void _savePermissionsRequested() {
+//     try {
+//       Hive.box('userdata').put('permissions_requested', true);
+//       print("Successfully saved permissions_requested flag to Hive");
+//     } catch (e) {
+//       print("Error saving permissions_requested flag: $e");
+//     }
+//   }
+
+//   void _showPermissionRequestDialog() {
+//     print("Current permission index before skipping: $_currentPermissionIndex");
+//     _permissions.forEach((permData) {
+//       final permission = permData['permission'] as Permission;
+//       print(
+//           "${permission.toString()}: ${_permissionsGranted[permission] == true ? 'GRANTED' : 'NOT GRANTED'}");
+//     });
+//     // Skip permissions that are already granted
+//     while (_currentPermissionIndex < _permissions.length) {
+//       final permission =
+//           _permissions[_currentPermissionIndex]['permission'] as Permission;
+
+//       // Check if this permission is already granted
+//       final isGranted = _permissionsGranted[permission];
+//       if (isGranted == true) {
+//         // This permission is already granted, move to next one
+//         print("Skipping already granted permission: ${permission.toString()}");
+//         _currentPermissionIndex++;
+//       } else {
+//         // Found a permission that needs attention
+//         print("Found permission needing attention: ${permission.toString()}");
+//         break;
+//       }
+//     }
+
+//     print("Current permission index after skipping: $_currentPermissionIndex");
+
+//     // Check if we've gone through all permissions
+//     if (_currentPermissionIndex >= _permissions.length) {
+//       // All permissions have been handled, save this fact and navigate to login
+//       print("All permissions processed, proceeding to next screen");
+//       _savePermissionsRequested();
+//       _navigateToLogin();
+//       return;
+//     }
+
+//     // Show dialog for current permission
+//     setState(() {
+//       _permissionRequestComplete = false;
+//       _showPermissionDialog = true;
+//     });
+//   }
+
+//   void _navigateToLogin() {
+//     var box = Hive.box(userdata);
+
+//     final bool hasAuthToken = box.get(authToken) != null;
+//     final bool hasLastName =
+//         box.get(lastName) != null && box.get(lastName)!.isNotEmpty;
+//     final bool hasFirstName =
+//         box.get(firstName) != null && box.get(firstName)!.isNotEmpty;
+//     final bool permissionsRequested =
+//         box.get('permissions_requested', defaultValue: false);
+
+//     // Check if user is fully logged in with profile
+//     if (hasAuthToken && hasLastName && hasFirstName) {
+//       print("☺☺☺☺GO TO HOME PAGE☺☺☺☺");
+//       // return TabbarScreen();
+//       Navigator.pushAndRemoveUntil(
+//         context,
+//         MaterialPageRoute(builder: (context) => TabbarScreen()),
+//         (route) => false,
+//       );
+//     }
+
+//     // User has completed permissions flow but still needs to login
+//     else if (!hasAuthToken && permissionsRequested) {
+//       print("☺☺☺☺GO TO LOGIN PAGE (permissions already handled)☺☺☺☺");
+
+//       Navigator.pushAndRemoveUntil(
+//         context,
+//         MaterialPageRoute(builder: (context) => Flogin()),
+//         (route) => false,
+//       );
+//     }
+//   }
+
+//   // Future<void> _requestCurrentPermission() async {
+//   //   if (_requestingPermission) return;
+
+//   //   _requestingPermission = true;
+
+//   //   try {
+//   //     final permissionData = _permissions[_currentPermissionIndex];
+//   //     final permission = permissionData['permission'] as Permission;
+
+//   //     // Special handling for photos permission on iOS
+//   //     if (permission == Permission.photos && Platform.isIOS) {
+//   //       // Check current status using our special check
+//   //       final isPhotoGranted = await _checkPhotoPermission();
+
+//   //       // If already granted, skip requesting
+//   //       if (isPhotoGranted) {
+//   //         print("Photos permission already granted");
+//   //         _permissionsGranted[permission] = true;
+//   //         setState(() {
+//   //           _permissionRequestComplete = true;
+//   //         });
+//   //         return;
+//   //       }
+
+//   //       // iOS specific handling
+//   //       if (_userInitiatedPermissionRequest) {
+//   //         print("Requesting iOS photos permission");
+//   //         final newStatus = await Permission.photos.request();
+//   //         print("Photos permission status after request: $newStatus");
+
+//   //         // Check again with our special check
+//   //         final newIsGranted = await _checkPhotoPermission();
+//   //         _permissionsGranted[permission] = newIsGranted;
+
+//   //         setState(() {
+//   //           _userInitiatedPermissionRequest = false;
+//   //           _permissionRequestComplete = true;
+//   //         });
+//   //       } else {
+//   //         setState(() {
+//   //           _permissionRequestComplete = true;
+//   //         });
+//   //       }
+//   //       return;
+//   //     }
+
+//   //     // For other permissions - standard handling
+//   //     // Check current status first
+//   //     final status = await permission.status;
+
+//   //     // If already granted, skip requesting
+//   //     if (status.isGranted) {
+//   //       print("Permission ${permission.toString()} already granted");
+//   //       _permissionsGranted[permission] = true;
+//   //       setState(() {
+//   //         _permissionRequestComplete = true;
+//   //       });
+//   //       return;
+//   //     }
+
+//   //     if (Platform.isIOS) {
+//   //       // For iOS, only proceed with permission request if explicitly initiated by user
+//   //       if (_userInitiatedPermissionRequest) {
+//   //         print("Current permission ${permission.toString()} status: $status");
+
+//   //         if (status.isPermanentlyDenied) {
+//   //           print("Permission ${permission.toString()} permanently denied");
+//   //         } else {
+//   //           print("Requesting iOS permission: ${permission.toString()}");
+//   //           final newStatus = await permission.request();
+//   //           print(
+//   //               "Permission ${permission.toString()} status after request: $newStatus");
+
+//   //           // Update the permission status in our tracking map
+//   //           _permissionsGranted[permission] = newStatus.isGranted;
+//   //         }
+
+//   //         // Reset the flag after handling this permission
+//   //         setState(() {
+//   //           _userInitiatedPermissionRequest = false;
+//   //           _permissionRequestComplete = true;
+//   //         });
+//   //       } else {
+//   //         // Just check status without requesting if not initiated by user
+//   //         print(
+//   //             "Checking permission status only (no request): ${permission.toString()} = $status");
+
+//   //         // Still mark as complete to show Next button if we're just checking
+//   //         setState(() {
+//   //           _permissionRequestComplete = true;
+//   //         });
+//   //       }
+//   //     } else {
+//   //       // For Android, request normally when user taps Allow
+//   //       final newStatus = await permission.request();
+//   //       print("Permission ${permission.toString()} status: $newStatus");
+
+//   //       // Update the permission status in our tracking map
+//   //       _permissionsGranted[permission] = newStatus.isGranted;
+
+//   //       // Mark as complete to show Next button
+//   //       setState(() {
+//   //         _permissionRequestComplete = true;
+//   //       });
+//   //     }
+//   //   } catch (e) {
+//   //     print("Permission request error: $e");
+//   //     // Mark as complete even if there's an error
+//   //     setState(() {
+//   //       _permissionRequestComplete = true;
+//   //       _userInitiatedPermissionRequest = false; // Reset flag on error
+//   //     });
+//   //   } finally {
+//   //     _requestingPermission = false;
+//   //   }
+//   // }
+
+//   Future<void> _requestCurrentPermission() async {
+//     if (_requestingPermission) return;
+//     _requestingPermission = true;
+
+//     try {
+//       final permissionData = _permissions[_currentPermissionIndex];
+//       final permission = permissionData['permission'] as Permission;
+
+//       // Check current status first
+//       final status = await permission.status;
+
+//       // If already granted, skip to next permission automatically
+//       if (status.isGranted) {
+//         print("Permission ${permission.toString()} already granted");
+//         _permissionsGranted[permission] = true;
+//         // Automatically move to next permission
+//         _moveToNextPermission();
+//         return;
+//       }
+
+//       // Handle iOS photo permission specially
+//       if (permission == Permission.photos && Platform.isIOS) {
+//         final isPhotoGranted = await _checkPhotoPermission();
+//         if (isPhotoGranted) {
+//           _permissionsGranted[permission] = true;
+//           _moveToNextPermission();
+//           return;
+//         }
+
+//         if (_userInitiatedPermissionRequest) {
+//           final newStatus = await Permission.photos.request();
+//           final newIsGranted = await _checkPhotoPermission();
+//           _permissionsGranted[permission] = newIsGranted;
+
+//           // No need to wait for "Next" - automatically move forward
+//           _moveToNextPermission();
+//           return;
+//         }
+//       }
+
+//       // For Android, handle storage permission specially
+//       if (Platform.isAndroid && permission == Permission.storage) {
+//         // For Android 13+ (API 33+), use more specific media permissions
+//         if (int.parse(Platform.version.split('.')[0]) >= 33) {
+//           // Use the photos permission instead (media images access)
+//           print("Using Photos permission for Android 13+");
+//           final photosStatus = await Permission.photos.request();
+//           _permissionsGranted[permission] = photosStatus.isGranted;
+//         } else {
+//           // For older Android, use storage permission
+//           final newStatus = await permission.request();
+//           _permissionsGranted[permission] = newStatus.isGranted;
+//         }
+
+//         // Automatically move to next permission
+//         _moveToNextPermission();
+//         return;
+//       }
+
+//       // Standard permission flow for other cases
+//       if (Platform.isIOS) {
+//         if (_userInitiatedPermissionRequest) {
+//           if (!status.isPermanentlyDenied) {
+//             final newStatus = await permission.request();
+//             _permissionsGranted[permission] = newStatus.isGranted;
+//           }
+//           setState(() {
+//             _userInitiatedPermissionRequest = false;
+//           });
+//           // Automatically move to next permission
+//           _moveToNextPermission();
+//         }
+//       } else {
+//         // For Android standard permissions
+//         final newStatus = await permission.request();
+//         _permissionsGranted[permission] = newStatus.isGranted;
+
+//         // Automatically move to next permission
+//         _moveToNextPermission();
+//       }
+//     } catch (e) {
+//       print("Permission request error: $e");
+//       // Even on error, move to next permission
+//       _moveToNextPermission();
+//     } finally {
+//       _requestingPermission = false;
+//     }
+//   }
+
+//   void _moveToNextPermission() {
+//     setState(() {
+//       _currentPermissionIndex++;
+//     });
+
+//     // Short delay before showing next permission dialog
+//     Future.delayed(Duration(milliseconds: 300), () {
+//       if (_currentPermissionIndex < _permissions.length) {
+//         _showPermissionRequestDialog();
+//       } else {
+//         // All permissions processed, save state and navigate
+//         _savePermissionsRequested();
+//         _navigateToLogin();
+//       }
+//     });
+//   }
+
+//   void _nextPermission() {
+//     setState(() {
+//       _showPermissionDialog = false;
+//       _currentPermissionIndex++;
+//       _permissionRequestComplete = false;
+//     });
+
+//     // Show next permission after a short delay
+//     Future.delayed(Duration(milliseconds: 300), () {
+//       _showPermissionRequestDialog();
+//     });
+//   }
+
+//   void _skipCurrentPermission() {
+//     // Update tracking that this permission was skipped (not granted)
+//     final permission =
+//         _permissions[_currentPermissionIndex]['permission'] as Permission;
+//     _permissionsGranted[permission] = false;
+
+//     setState(() {
+//       _permissionRequestComplete = true;
+//     });
+//   }
+
+//   Future<void> _startPermissionFlow() async {
+//     // Ensure permissions are checked before starting the flow
+//     if (!_permissionsInitialized) {
+//       await _checkAllPermissionsStatus();
+//     }
+
+//     // Print current permissions status before starting flow
+//     print("Starting permission flow with current statuses:");
+//     _permissions.forEach((permData) {
+//       final permission = permData['permission'] as Permission;
+//       print(
+//           "Permission status before flow: ${permission.toString()}: ${_permissionsGranted[permission]}");
+//     });
+
+//     setState(() {
+//       _continuePressed = true;
+//       _currentPermissionIndex = 0;
+//       _permissionRequestComplete = false;
+//       _userInitiatedPermissionRequest = false; // Important: reset this flag
+//     });
+//     _showPermissionRequestDialog();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     // Get screen dimensions
+//     final screenSize = MediaQuery.of(context).size;
+//     final screenWidth = screenSize.width;
+//     final screenHeight = screenSize.height;
+
+//     // Responsive sizing
+//     final bool isSmallScreen = screenWidth < 360;
+//     final bool isLargeScreen = screenWidth > 600;
+
+//     // Calculate responsive values
+//     final double logoSize =
+//         isSmallScreen ? 90.0 : (isLargeScreen ? 150.0 : 120.0);
+//     final double iconSize =
+//         isSmallScreen ? 45.0 : (isLargeScreen ? 70.0 : 60.0);
+//     final double titleFontSize =
+//         isSmallScreen ? 30.0 : (isLargeScreen ? 46.0 : 38.0);
+//     final double descFontSize =
+//         isSmallScreen ? 16.0 : (isLargeScreen ? 22.0 : 19.0);
+//     final double subDescFontSize =
+//         isSmallScreen ? 14.0 : (isLargeScreen ? 18.0 : 16.0);
+//     final double buttonWidth =
+//         screenWidth * 0.75 > 290 ? 290 : screenWidth * 0.75;
+//     final double buttonHeight =
+//         isSmallScreen ? 50.0 : (isLargeScreen ? 70.0 : 60.0);
+
+//     // Adjust vertical spacing based on screen height
+//     final double topPadding = screenHeight * 0.05;
+//     final double verticalSpacing = screenHeight * 0.02;
+//     final double bottomPadding = screenHeight * 0.03;
+
+//     return Scaffold(
+//       body: Stack(
+//         children: [
+//           // Background gradient
+//           Container(
+//             decoration: BoxDecoration(
+//               gradient: LinearGradient(
+//                 begin: Alignment.topCenter,
+//                 end: Alignment.bottomCenter,
+//                 colors: [
+//                   Colors.white,
+//                   Color(0xFFF7F5FF),
+//                   Color(0xFFF0ECFF),
+//                 ],
+//               ),
+//             ),
+//           ),
+
+//           // Decorative elements - responsive positioning
+//           Positioned(
+//             top: -screenWidth * 0.25,
+//             right: -screenWidth * 0.25,
+//             child: Container(
+//               width: screenWidth * 0.5,
+//               height: screenWidth * 0.5,
+//               decoration: BoxDecoration(
+//                 shape: BoxShape.circle,
+//                 color: chatownColor.withOpacity(0.1),
+//               ),
+//             ),
+//           ),
+//           Positioned(
+//             bottom: screenHeight * 0.3,
+//             left: -screenWidth * 0.2,
+//             child: Container(
+//               width: screenWidth * 0.4,
+//               height: screenWidth * 0.4,
+//               decoration: BoxDecoration(
+//                 shape: BoxShape.circle,
+//                 color: chatownColor.withOpacity(0.07),
+//               ),
+//             ),
+//           ),
+
+//           // Main content
+//           SafeArea(
+//             child: Column(
+//               children: [
+//                 // Top content area
+//                 Expanded(
+//                   child: SingleChildScrollView(
+//                     physics: BouncingScrollPhysics(),
+//                     child: Column(
+//                       children: [
+//                         // App permissions header
+//                         Padding(
+//                           padding: EdgeInsets.only(
+//                               top: topPadding, bottom: verticalSpacing),
+//                           child: Row(
+//                             mainAxisAlignment: MainAxisAlignment.center,
+//                             children: [
+//                               Container(
+//                                 width: isSmallScreen ? 50 : 64,
+//                                 height: isSmallScreen ? 50 : 64,
+//                                 padding:
+//                                     EdgeInsets.all(isSmallScreen ? 12 : 16),
+//                                 decoration: BoxDecoration(
+//                                   color: const Color(0xFFF2EEFB),
+//                                   borderRadius: BorderRadius.circular(16),
+//                                 ),
+//                                 child: Icon(
+//                                   Icons.shield,
+//                                   color: chatownColor,
+//                                   size: isSmallScreen ? 24 : 32,
+//                                 ),
+//                               ),
+//                               SizedBox(width: 12),
+//                               Text(
+//                                 languageController
+//                                     .textTranslate("App Permissions"),
+//                                 style: TextStyle(
+//                                   fontSize: isSmallScreen ? 20 : 24,
+//                                   fontWeight: FontWeight.w600,
+//                                   color: Colors.black87,
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ),
+
+//                         // App content
+//                         Container(
+//                           padding: EdgeInsets.symmetric(
+//                               horizontal: screenWidth * 0.08,
+//                               vertical: verticalSpacing),
+//                           constraints:
+//                               BoxConstraints(minHeight: screenHeight * 0.5),
+//                           child: Column(
+//                             mainAxisAlignment: MainAxisAlignment.center,
+//                             children: [
+//                               // App Logo
+//                               Container(
+//                                 width: logoSize,
+//                                 height: logoSize,
+//                                 margin: EdgeInsets.only(
+//                                     bottom: verticalSpacing * 1.5),
+//                                 decoration: BoxDecoration(
+//                                   color: const Color(0xFFF2EEFB),
+//                                   borderRadius:
+//                                       BorderRadius.circular(logoSize * 0.25),
+//                                   boxShadow: [
+//                                     BoxShadow(
+//                                       color: chatownColor.withOpacity(0.2),
+//                                       blurRadius: 15,
+//                                       offset: Offset(0, 5),
+//                                     ),
+//                                   ],
+//                                 ),
+//                                 child: Center(
+//                                   child: Icon(
+//                                     Icons.chat_bubble,
+//                                     color: chatownColor,
+//                                     size: iconSize,
+//                                   ),
+//                                 ),
+//                               ),
+
+//                               // App Name
+//                               Text(
+//                                 'whoxa Messenger',
+//                                 textAlign: TextAlign.center,
+//                                 style: TextStyle(
+//                                   fontSize: titleFontSize,
+//                                   fontWeight: FontWeight.w700,
+//                                   color: Colors.black,
+//                                   letterSpacing: 1.2,
+//                                 ),
+//                               ),
+
+//                               SizedBox(height: verticalSpacing * 3),
+
+//                               // App description
+//                               Container(
+//                                 padding: EdgeInsets.symmetric(
+//                                     horizontal: screenWidth * 0.04),
+//                                 child: Column(
+//                                   children: [
+//                                     Text(
+//                                       languageController.textTranslate(
+//                                           "Chat effortlessly with friends and family anytime, anywhere!"),
+//                                       textAlign: TextAlign.center,
+//                                       style: TextStyle(
+//                                         fontSize: descFontSize,
+//                                         fontWeight: FontWeight.w500,
+//                                         height: 1.4,
+//                                         color: Colors.black87,
+//                                       ),
+//                                     ),
+//                                     SizedBox(height: verticalSpacing),
+//                                     Text(
+//                                       languageController.textTranslate(
+//                                           "Share photos and chat anytime."),
+//                                       textAlign: TextAlign.center,
+//                                       style: TextStyle(
+//                                         fontSize: subDescFontSize,
+//                                         fontWeight: FontWeight.w400,
+//                                         color: Colors.black54,
+//                                       ),
+//                                     ),
+//                                   ],
+//                                 ),
+//                               ),
+//                             ],
+//                           ),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//                 ),
+
+//                 // Bottom chat button - responsive sizing
+//                 Padding(
+//                   padding: EdgeInsets.only(
+//                       bottom: bottomPadding, top: verticalSpacing),
+//                   child: GestureDetector(
+//                     onTap: () {
+//                       if (!_continuePressed) {
+//                         _startPermissionFlow();
+//                       }
+//                     },
+//                     child: Container(
+//                       width: buttonWidth,
+//                       height: buttonHeight,
+//                       decoration: BoxDecoration(
+//                         gradient: LinearGradient(
+//                             colors: [
+//                               secondaryColor,
+//                               chatownColor,
+//                             ],
+//                             begin: Alignment.topCenter,
+//                             end: Alignment.bottomCenter),
+//                         borderRadius: BorderRadius.circular(buttonHeight / 2),
+//                         boxShadow: [
+//                           BoxShadow(
+//                             color: chatownColor.withOpacity(0.3),
+//                             spreadRadius: 1,
+//                             blurRadius: 20,
+//                             offset: Offset(0, 8),
+//                           ),
+//                         ],
+//                       ),
+//                       child: Row(
+//                         mainAxisAlignment: MainAxisAlignment.center,
+//                         children: [
+//                           Text(
+//                             "Continue",
+//                             style: TextStyle(
+//                               color: Colors.white,
+//                               fontSize: isSmallScreen
+//                                   ? 16
+//                                   : (isLargeScreen ? 20 : 18),
+//                               fontWeight: FontWeight.w600,
+//                               letterSpacing: 0.5,
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+
+//           // Permission dialog overlay - responsive sizing
+//           if (_showPermissionDialog &&
+//               _currentPermissionIndex < _permissions.length)
+//             _buildPermissionDialog(context, screenWidth, screenHeight),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _buildPermissionDialog(
+//       BuildContext context, double screenWidth, double screenHeight) {
+//     final permissionData = _permissions[_currentPermissionIndex];
+
+//     // Responsive dialog sizing
+//     final bool isSmallScreen = screenWidth < 360;
+//     final bool isLargeScreen = screenWidth > 600;
+
+//     final double dialogPadding =
+//         screenWidth * 0.07 > 28 ? 28 : screenWidth * 0.07;
+//     final double iconSize = isSmallScreen ? 32 : (isLargeScreen ? 52 : 44);
+//     final double titleSize = isSmallScreen ? 18 : (isLargeScreen ? 26 : 22);
+//     final double descSize = isSmallScreen ? 14 : (isLargeScreen ? 18 : 16);
+
+//     return Container(
+//       color: Colors.black.withOpacity(0.6),
+//       width: double.infinity,
+//       height: double.infinity,
+//       child: Center(
+//         child: SingleChildScrollView(
+//           physics: BouncingScrollPhysics(),
+//           child: Container(
+//             margin: EdgeInsets.symmetric(
+//                 horizontal: screenWidth * 0.06, vertical: screenHeight * 0.04),
+//             padding: EdgeInsets.all(dialogPadding),
+//             decoration: BoxDecoration(
+//               color: Colors.white,
+//               borderRadius: BorderRadius.circular(24),
+//               boxShadow: [
+//                 BoxShadow(
+//                   color: Colors.black.withOpacity(0.1),
+//                   blurRadius: 20,
+//                   spreadRadius: 2,
+//                 ),
+//               ],
+//             ),
+//             child: Column(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 Container(
+//                   width: isSmallScreen ? 60 : (isLargeScreen ? 100 : 80),
+//                   height: isSmallScreen ? 60 : (isLargeScreen ? 100 : 80),
+//                   decoration: BoxDecoration(
+//                     color: const Color(0xFFF2EEFB),
+//                     borderRadius: BorderRadius.circular(20),
+//                     boxShadow: [
+//                       BoxShadow(
+//                         color: chatownColor.withOpacity(0.15),
+//                         blurRadius: 10,
+//                         offset: Offset(0, 3),
+//                       ),
+//                     ],
+//                   ),
+//                   child: Icon(
+//                     _getIconForPermission(permissionData['title']),
+//                     size: iconSize,
+//                     color: chatownColor,
+//                   ),
+//                 ),
+//                 SizedBox(height: screenHeight * 0.025),
+//                 Text(
+//                   permissionData['title'],
+//                   style: TextStyle(
+//                     fontSize: titleSize,
+//                     fontWeight: FontWeight.bold,
+//                     color: Colors.black87,
+//                     letterSpacing: 0.5,
+//                   ),
+//                 ),
+//                 SizedBox(height: screenHeight * 0.015),
+//                 Text(
+//                   permissionData['description'],
+//                   textAlign: TextAlign.center,
+//                   style: TextStyle(
+//                     fontSize: descSize,
+//                     color: Colors.black54,
+//                     height: 1.5,
+//                     letterSpacing: 0.2,
+//                   ),
+//                 ),
+//                 SizedBox(height: screenHeight * 0.03),
+
+//                 // Show different buttons based on if permission request is complete
+//                 if (!_permissionRequestComplete)
+//                   // Show Allow/Not Now before permission is requested
+//                   isSmallScreen
+//                       ? Column(
+//                           children: [
+//                             Container(
+//                               decoration: BoxDecoration(
+//                                 gradient: LinearGradient(
+//                                   colors: [
+//                                     chatownColor.withOpacity(0.9),
+//                                     chatownColor,
+//                                     Color(0xFF5C35E5), // Darker purple shade
+//                                   ],
+//                                   begin: Alignment.topLeft,
+//                                   end: Alignment.bottomRight,
+//                                 ),
+//                                 borderRadius: BorderRadius.circular(14),
+//                                 boxShadow: [
+//                                   BoxShadow(
+//                                     color: chatownColor.withOpacity(0.3),
+//                                     blurRadius: 8,
+//                                     offset: Offset(0, 4),
+//                                   ),
+//                                 ],
+//                               ),
+//                               child: ElevatedButton(
+//                                 onPressed: () {
+//                                   // Set flag to indicate user initiated the permission request
+//                                   setState(() {
+//                                     _userInitiatedPermissionRequest = true;
+//                                   });
+
+//                                   // Then request the permission
+//                                   _requestCurrentPermission();
+//                                 },
+//                                 style: ElevatedButton.styleFrom(
+//                                   backgroundColor: Colors.transparent,
+//                                   foregroundColor: Colors.white,
+//                                   shadowColor: Colors.transparent,
+//                                   minimumSize: Size(screenWidth * 0.6, 44),
+//                                   shape: RoundedRectangleBorder(
+//                                     borderRadius: BorderRadius.circular(14),
+//                                   ),
+//                                   elevation: 0,
+//                                 ),
+//                                 child: Text(
+//                                   'Allow',
+//                                   style: TextStyle(
+//                                     fontSize: descSize,
+//                                     fontWeight: FontWeight.w600,
+//                                     letterSpacing: 0.5,
+//                                   ),
+//                                 ),
+//                               ),
+//                             ),
+//                             SizedBox(height: 12),
+//                             TextButton(
+//                               onPressed: _skipCurrentPermission,
+//                               style: TextButton.styleFrom(
+//                                 minimumSize: Size(screenWidth * 0.6, 44),
+//                               ),
+//                               child: Text(
+//                                 'Not Now',
+//                                 style: TextStyle(
+//                                   fontSize: descSize,
+//                                   fontWeight: FontWeight.w500,
+//                                   color: Colors.black54,
+//                                 ),
+//                               ),
+//                             ),
+//                           ],
+//                         )
+//                       : Row(
+//                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//                           children: [
+//                             TextButton(
+//                               onPressed: _skipCurrentPermission,
+//                               style: TextButton.styleFrom(
+//                                 padding: EdgeInsets.symmetric(
+//                                     horizontal: 24, vertical: 14),
+//                               ),
+//                               child: Text(
+//                                 'Not Now',
+//                                 style: TextStyle(
+//                                   fontSize: descSize,
+//                                   fontWeight: FontWeight.w500,
+//                                   color: Colors.black54,
+//                                 ),
+//                               ),
+//                             ),
+//                             Container(
+//                               decoration: BoxDecoration(
+//                                 gradient: LinearGradient(
+//                                     colors: [
+//                                       secondaryColor,
+//                                       chatownColor,
+//                                     ],
+//                                     begin: Alignment.topCenter,
+//                                     end: Alignment.bottomCenter),
+//                                 borderRadius: BorderRadius.circular(14),
+//                                 boxShadow: [
+//                                   BoxShadow(
+//                                     color: chatownColor.withOpacity(0.3),
+//                                     blurRadius: 8,
+//                                     offset: Offset(0, 4),
+//                                   ),
+//                                 ],
+//                               ),
+//                               child: ElevatedButton(
+//                                 onPressed: () {
+//                                   // Set flag to indicate user initiated the permission request
+//                                   setState(() {
+//                                     _userInitiatedPermissionRequest = true;
+//                                   });
+
+//                                   // Then request the permission
+//                                   _requestCurrentPermission();
+//                                 },
+//                                 style: ElevatedButton.styleFrom(
+//                                   backgroundColor: Colors.transparent,
+//                                   foregroundColor: Colors.white,
+//                                   shadowColor: Colors.transparent,
+//                                   padding: EdgeInsets.symmetric(
+//                                       horizontal: 36, vertical: 14),
+//                                   shape: RoundedRectangleBorder(
+//                                     borderRadius: BorderRadius.circular(14),
+//                                   ),
+//                                   elevation: 0,
+//                                 ),
+//                                 child: Text(
+//                                   'Allow',
+//                                   style: TextStyle(
+//                                     fontSize: descSize,
+//                                     fontWeight: FontWeight.w600,
+//                                     letterSpacing: 0.5,
+//                                   ),
+//                                 ),
+//                               ),
+//                             ),
+//                           ],
+//                         )
+//                 else
+//                   // Show Next button after permission is requested
+//                   Container(
+//                     width: screenWidth * 0.6,
+//                     decoration: BoxDecoration(
+//                       gradient: LinearGradient(
+//                           colors: [
+//                             secondaryColor,
+//                             chatownColor,
+//                           ],
+//                           begin: Alignment.topCenter,
+//                           end: Alignment.bottomCenter),
+//                       borderRadius: BorderRadius.circular(14),
+//                       boxShadow: [
+//                         BoxShadow(
+//                           color: chatownColor.withOpacity(0.3),
+//                           blurRadius: 8,
+//                           offset: Offset(0, 4),
+//                         ),
+//                       ],
+//                     ),
+//                     child: ElevatedButton(
+//                       onPressed: _nextPermission,
+//                       style: ElevatedButton.styleFrom(
+//                         backgroundColor: Colors.transparent,
+//                         foregroundColor: Colors.white,
+//                         shadowColor: Colors.transparent,
+//                         padding:
+//                             EdgeInsets.symmetric(horizontal: 36, vertical: 14),
+//                         shape: RoundedRectangleBorder(
+//                           borderRadius: BorderRadius.circular(14),
+//                         ),
+//                         elevation: 0,
+//                       ),
+//                       child: Text(
+//                         _currentPermissionIndex < _permissions.length - 1
+//                             ? 'Next'
+//                             : 'Continue',
+//                         style: TextStyle(
+//                           fontSize: descSize,
+//                           fontWeight: FontWeight.w600,
+//                           letterSpacing: 0.5,
+//                         ),
+//                       ),
+//                     ),
+//                   ),
+//               ],
+//             ),
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+
+//   IconData _getIconForPermission(String permissionTitle) {
+//     switch (permissionTitle) {
+//       case 'Notifications':
+//         return Icons.notifications_outlined;
+//       case 'Location':
+//         return Icons.location_on_outlined;
+//       case 'Camera':
+//         return Icons.camera_alt_outlined;
+//       case 'Microphone':
+//         return Icons.mic_outlined;
+//       case 'Storage':
+//         return Icons.storage_outlined;
+//       case 'Photos':
+//         return Icons.photo_library_outlined;
+//       case 'Contacts':
+//         return Icons.contacts_outlined;
+//       default:
+//         return Icons.settings_outlined;
+//     }
+//   }
+// }

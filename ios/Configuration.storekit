@@ -1,0 +1,170 @@
+{
+  "identifier" : "F7C72A3B",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6444149671",
+    "_developerTeam" : "PT9H3S Elite Industries",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 767746320.98917103,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptions" : [
+    {
+      "adHocOffers" : [
+
+      ],
+      "codeOffers" : [
+
+      ],
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "groupNumber" : 1,
+      "internalID" : "6444149672",
+      "introductoryOffer" : null,
+      "localizations" : [
+        {
+          "description" : "Basic monthly subscription",
+          "displayName" : "Velvet Access",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "velvet_access",
+      "recurringSubscriptionPeriod" : "P1M",
+      "referenceName" : "Velvet Access",
+      "subscriptionGroupID" : "21482542",
+      "type" : "RecurringSubscription"
+    },
+    {
+      "adHocOffers" : [
+
+      ],
+      "codeOffers" : [
+
+      ],
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "groupNumber" : 2,
+      "internalID" : "6444149673",
+      "introductoryOffer" : null,
+      "localizations" : [
+        {
+          "description" : "Premium quarterly subscription",
+          "displayName" : "Sapphire Pass",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "sapphire_pass",
+      "recurringSubscriptionPeriod" : "P3M",
+      "referenceName" : "Sapphire Pass",
+      "subscriptionGroupID" : "21482542",
+      "type" : "RecurringSubscription"
+    },
+    {
+      "adHocOffers" : [
+
+      ],
+      "codeOffers" : [
+
+      ],
+      "displayPrice" : "5.99",
+      "familyShareable" : false,
+      "groupNumber" : 3,
+      "internalID" : "6444149674",
+      "introductoryOffer" : null,
+      "localizations" : [
+        {
+          "description" : "Premium biannual subscription",
+          "displayName" : "Golden Privilege",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "golden_privilege",
+      "recurringSubscriptionPeriod" : "P6M",
+      "referenceName" : "Golden Privilege",
+      "subscriptionGroupID" : "21482542",
+      "type" : "RecurringSubscription"
+    },
+    {
+      "adHocOffers" : [
+
+      ],
+      "codeOffers" : [
+
+      ],
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "groupNumber" : 4,
+      "internalID" : "6444149675",
+      "introductoryOffer" : null,
+      "localizations" : [
+        {
+          "description" : "Elite annual subscription",
+          "displayName" : "Elite Infinity",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "elite_infinity",
+      "recurringSubscriptionPeriod" : "P1Y",
+      "referenceName" : "Elite Infinity",
+      "subscriptionGroupID" : "21482542",
+      "type" : "RecurringSubscription"
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
