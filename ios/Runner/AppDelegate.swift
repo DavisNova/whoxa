@@ -24,7 +24,7 @@ import GoogleMaps
         GeneratedPluginRegistrant.register(with: flutterEngine)
         
         // Register custom gallery plugin
-        GalleryPlugin.register(with: self.registrar(forPlugin: "GalleryPlugin")!)
+        //GalleryPlugin.register(with: self.registrar(forPlugin: "GalleryPlugin")!)
 
         // Set up the method channel to communicate with Flutter
         let channel = FlutterMethodChannel(name: CHANNEL1,
