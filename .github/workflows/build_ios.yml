@@ -19,16 +19,19 @@ jobs:
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.6'
+        flutter-version: '3.27.1'
         channel: 'stable'
-        cache: true
+        cache: false  # 禁用缓存，强制使用新版本
+    
+    - name: Verify Flutter version
+      run: flutter --version
     
     - name: Install Flutter dependencies
       run: flutter pub get
     
     - name: Analyze Flutter code
       run: flutter analyze
-      continue-on-error: true  # 即使有警告也继续构建
+      continue-on-error: true
     
     - name: Setup iOS dependencies
       run: |
