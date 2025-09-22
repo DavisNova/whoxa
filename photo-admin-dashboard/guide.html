@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用指南 - Beimo 照片管理后台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 2rem;
+        }
+        
+        .section {
+            margin-bottom: 2rem;
+        }
+        
+        .section h2 {
+            color: #1f2937;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .feature-card {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .feature-card h3 {
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-card p {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .step-list {
+            counter-reset: step-counter;
+        }
+        
+        .step {
+            counter-increment: step-counter;
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            position: relative;
+            padding-left: 4rem;
+        }
+        
+        .step::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            background: #3b82f6;
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .step h3 {
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step p {
+            color: #6b7280;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #3b82f6;
+            border: 2px solid #3b82f6;
+        }
+        
+        .btn-secondary:hover {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .highlight {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .code {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        @media (max-width: 640px) {
+            body {
+                padding: 1rem;
+            }
+            
+            .content {
+                padding: 1rem;
+            }
+            
+            .header {
+                padding: 1.5rem;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📸 Beimo 照片管理后台</h1>
+            <p>现代化、精美的照片管理系统使用指南</p>
+        </div>
+        
+        <div class="content">
+            <div class="highlight">
+                <strong>🎉 恭喜！</strong> 您已成功创建了一个功能完整的照片管理后台系统
+            </div>
+            
+            <div class="section">
+                <h2>🌟 主要功能</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>📊 仪表盘</h3>
+                        <p>实时统计数据、最近上传、活跃用户展示</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>📸 照片管理</h3>
+                        <p>网格/列表视图、高级筛选、批量操作</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🗂️ 分组管理</h3>
+                        <p>创建分组、颜色标识、智能分类</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>👥 用户管理</h3>
+                        <p>用户列表、统计信息、权限控制</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🚀 快速开始</h2>
+                <div class="step-list">
+                    <div class="step">
+                        <h3>启动本地服务器</h3>
+                        <p>双击 <code>start-server.bat</code> 文件，或在浏览器中直接打开 <code>index.html</code></p>
+                    </div>
+                    <div class="step">
+                        <h3>配置 API 连接</h3>
+                        <p>进入"系统设置"页面，修改 API 地址为您的服务器地址</p>
+                    </div>
+                    <div class="step">
+                        <h3>开始管理照片</h3>
+                        <p>切换到"照片管理"页面，查看和管理上传的照片</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>⚙️ API 集成</h2>
+                <p>当前系统使用模拟数据进行演示。要连接到真实的 Beimo API，请修改以下配置：</p>
+                <div class="code">
+// 在 js/app.js 中修改 API 调用方法
+async mockApiCall(endpoint, mockData) {
+    const response = await fetch(`${this.config.apiUrl}${endpoint}`, {
+        headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+        }
+    });
+    return await response.json();
+}
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🎨 界面特色</h2>
+                <ul style="list-style: none; padding-left: 0;">
+                    <li style="margin-bottom: 0.5rem;">✨ <strong>现代化设计</strong> - 渐变色彩、毛玻璃效果</li>
+                    <li style="margin-bottom: 0.5rem;">📱 <strong>响应式布局</strong> - 完美适配各种设备</li>
+                    <li style="margin-bottom: 0.5rem;">🔄 <strong>实时刷新</strong> - 自动更新数据</li>
+                    <li style="margin-bottom: 0.5rem;">⌨️ <strong>快捷键支持</strong> - 提高操作效率</li>
+                    <li style="margin-bottom: 0.5rem;">🎯 <strong>智能筛选</strong> - 快速找到目标内容</li>
+                </ul>
+            </div>
+            
+            <div class="section">
+                <h2>📋 文件结构</h2>
+                <div class="code">
+photo-admin-dashboard/
+├── index.html          # 主页面文件
+├── guide.html          # 使用指南（当前页面）
+├── README.md           # 详细说明文档
+├── config.json         # 配置文件
+├── start-server.bat    # 启动脚本
+├── css/
+│   └── style.css       # 样式文件
+├── js/
+│   └── app.js          # 主要功能代码
+└── images/             # 图片资源目录
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🔧 技术支持</h2>
+                <p>如果遇到问题，请：</p>
+                <ol style="padding-left: 1.5rem;">
+                    <li>检查浏览器控制台错误信息</li>
+                    <li>确认网络连接和 API 服务状态</li>
+                    <li>查看 README.md 中的故障排除部分</li>
+                    <li>确保所有文件完整且路径正确</li>
+                </ol>
+            </div>
+            
+            <div class="button-group">
+                <a href="index.html" class="btn btn-primary">
+                    🚀 开始使用管理后台
+                </a>
+                <a href="README.md" class="btn btn-secondary">
+                    📖 查看详细文档
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

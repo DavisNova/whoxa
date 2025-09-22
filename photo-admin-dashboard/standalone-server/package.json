@@ -1,0 +1,32 @@
+{
+  "name": "beimo-photo-manager",
+  "version": "1.0.0",
+  "description": "Beimo照片管理系统 - 独立运行版本",
+  "main": "photo-manager-app.js",
+  "scripts": {
+    "start": "node photo-manager-app.js",
+    "dev": "nodemon photo-manager-app.js",
+    "pm2:start": "pm2 start photo-manager-app.js --name photo-manager",
+    "pm2:stop": "pm2 stop photo-manager",
+    "pm2:restart": "pm2 restart photo-manager",
+    "pm2:delete": "pm2 delete photo-manager"
+  },
+  "keywords": [
+    "photo",
+    "management",
+    "beimo",
+    "admin",
+    "dashboard"
+  ],
+  "author": "Beimo Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

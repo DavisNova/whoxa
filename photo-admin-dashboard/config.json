@@ -1,0 +1,32 @@
+{
+  "app": {
+    "name": "Beimo 照片管理后台",
+    "version": "1.0.0",
+    "description": "现代化照片管理系统"
+  },
+  "api": {
+    "baseUrl": "http://195.86.16.16:3000/api",
+    "timeout": 10000,
+    "retryAttempts": 3
+  },
+  "ui": {
+    "theme": "light",
+    "defaultPageSize": 50,
+    "refreshInterval": 30000,
+    "autoRefresh": true
+  },
+  "features": {
+    "enableGroupManagement": true,
+    "enableUserManagement": true,
+    "enableBatchOperations": true,
+    "enablePhotoDownload": true
+  },
+  "demo": {
+    "enabled": true,
+    "mockDataCount": {
+      "photos": 200,
+      "users": 50,
+      "groups": 15
+    }
+  }
+}
