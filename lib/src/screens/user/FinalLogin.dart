@@ -255,7 +255,7 @@ class _FloginState extends State<Flogin> {
                                 ),
                                 Text(
                                   languageController
-                                      .textTranslate('OTP: 123456'),
+                                      .textTranslate('请输入验证码'),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,

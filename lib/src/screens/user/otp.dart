@@ -130,31 +130,7 @@ class _otpState extends State<otp> {
     print(start);
     _startTimer();
 
-    // 自动填入测试 OTP 并自动验证
-    _autoFillAndVerifyOTP();
-
     super.initState();
-  }
-
-  // 自动填入测试 OTP 并验证
-  void _autoFillAndVerifyOTP() async {
-    // 延迟 2 秒后自动填入测试 OTP
-    await Future.delayed(Duration(seconds: 2));
-    
-    if (mounted) {
-      setState(() {
-        _codeController.text = "123456";
-        isOtpComplete = true;
-      });
-      
-      // 再延迟 1 秒后自动验证
-      await Future.delayed(Duration(seconds: 1));
-      
-      if (mounted) {
-        // 自动调用验证函数
-        otpcheck();
-      }
-    }
   }
 
   PinTheme defaultPinTheme = PinTheme(
@@ -495,7 +471,7 @@ class _otpState extends State<otp> {
                                     ),
                                     Text(
                                       languageController
-                                          .textTranslate('OTP: 123456'),
+                                          .textTranslate('请输入验证码'),
                                       style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
@@ -515,8 +491,8 @@ class _otpState extends State<otp> {
                                   alignment: Alignment.centerRight,
                                   child: GestureDetector(
                                     onTap: () {
-                                      _codeController.text = "123456";
-                                      setState(() {});
+                                      // 禁用自动填入功能 - 用户必须手动输入验证码
+                                      print("Auto-fill button disabled");
                                     },
                                     child: Image.asset(
                                       "assets/icons/copy.png",
@@ -540,173 +516,85 @@ class _otpState extends State<otp> {
       setState(() {
         isLoading2 = true;
       });
-      
-      // 检查是否是测试 OTP (123456)
-      if (_codeController.text == "123456") {
-        // 测试模式：调用后端 API 创建真实用户
-        print("☺☺☺☺TEST MODE: Creating real user with phone ${widget.phoneController}☺☺☺☺");
-        
-        try {
-          // 调用后端 API 验证 OTP（使用测试 OTP）
-          var uri = Uri.parse(apiHelper.verifyOtpPhone);
-          var request = http.MultipartRequest("POST", uri);
-          Map<String, String> headers = {
-            "Accept": "application/json",
-          };
-          request.headers.addAll(headers);
+      var uri = Uri.parse(apiHelper.verifyOtpPhone);
+      var request = http.MultipartRequest("POST", uri);
+      Map<String, String> headers = {
+        "Accept": "application/json",
+      };
+      request.headers.addAll(headers);
 
-          request.fields['country_code'] = widget.selectedCountry!;
-          request.fields['phone_number'] = widget.phoneController;
-          request.fields['otp'] = "123456"; // 使用测试 OTP
-          request.fields['device_token'] = _fcmtoken;
-          request.fields['one_signal_player_id'] =
-              OneSignal.User.pushSubscription.id!;
+      request.fields['country_code'] = widget.selectedCountry!;
+      request.fields['phone_number'] = widget.phoneController;
+      request.fields['otp'] = _codeController.text;
+      request.fields['device_token'] = _fcmtoken;
+      request.fields['one_signal_player_id'] =
+          OneSignal.User.pushSubscription.id!;
 
-          var response = await request.send();
-          print("Test OTP verification status: ${response.statusCode}");
+      var response = await request.send();
+      print(response.statusCode);
 
-          String responseData =
-              await response.stream.transform(utf8.decoder).join();
-          var userData = json.decode(responseData);
-          send = VerifyOTPModel.fromJson(userData);
-          log('Test OTP verification response: $responseData');
-          
-          if (send!.success == true) {
-            // 使用后端返回的真实token
-            await Hive.box(userdata).put(authToken, send!.token.toString());
-            await Hive.box(userdata)
-                .put(userName, send!.resData!.userName.toString());
-            await Hive.box(userdata)
-                .put(firstName, send!.resData!.firstName.toString());
-            await Hive.box(userdata)
-                .put(lastName, send!.resData!.lastName.toString());
-            await Hive.box(userdata)
-                .put(userImage, send!.resData!.profileImage.toString());
-            await Hive.box(userdata)
-                .put(userGender, send!.resData!.gender.toString());
-            await Hive.box(userdata)
-                .put(userCountryName, send!.resData!.countryFullName.toString());
-            await Hive.box(userdata)
-                .put(userId, send!.resData!.userId);
-            await Hive.box(userdata)
-                .put(userMobile, send!.resData!.countryCode! + send!.resData!.phoneNumber!);
-
-            _timer?.cancel();
-            isLoading2 = false;
-            Navigator.of(context, rootNavigator: true).pop();
-            _setDataToHive(send!);
-
-            print("☺☺☺☺GO TO HOME PAGE (REAL USER)☺☺☺☺");
-            Get.offAll(TabbarScreen(
-              currentTab: 0,
-            ));
-          } else {
-            // 如果后端验证失败，尝试在后端创建用户
-            await _createUserInBackend();
-          }
-        } catch (e) {
-          print("Error in test OTP verification: $e");
-          // 如果出错，尝试在后端创建用户
-          await _createUserInBackend();
+      String responseData =
+          await response.stream.transform(utf8.decoder).join();
+      var userData = json.decode(responseData);
+      send = VerifyOTPModel.fromJson(userData);
+      log('otp check response : $responseData');
+      if (send!.success == true) {
+        await Hive.box(userdata).put(authToken, send!.token.toString());
+        await Hive.box(userdata)
+            .put(userName, send!.resData!.userName.toString());
+        await Hive.box(userdata)
+            .put(firstName, send!.resData!.firstName.toString());
+        await Hive.box(userdata)
+            .put(lastName, send!.resData!.lastName.toString());
+        await Hive.box(userdata)
+            .put(userImage, send!.resData!.profileImage.toString());
+        // Banner functionality removed
+        // Badge functionality removed
+        if (send!.resData!.gender != '') {
+          await Hive.box(userdata)
+              .put(userGender, send!.resData!.gender.toString());
         }
-        
+
+        if (send!.resData!.countryFullName != '') {
+          await Hive.box(userdata)
+              .put(userCountryName, send!.resData!.countryFullName.toString());
+        }
+
+        _timer?.cancel();
+        isLoading2 = false;
+        Navigator.of(context, rootNavigator: true).pop();
+        _setDataToHive(send!);
+
+        if (Hive.box(userdata).get(authToken) != null &&
+            Hive.box(userdata).get(lastName) != null &&
+            Hive.box(userdata).get(lastName)!.isNotEmpty &&
+            Hive.box(userdata).get(firstName) != null &&
+            Hive.box(userdata).get(firstName)!.isNotEmpty) {
+          print("☺☺☺☺GO TO HOME PAGE☺☺☺☺");
+          Get.offAll(TabbarScreen(
+            currentTab: 0,
+          ));
+        } else {
+          Navigator.pushReplacement(
+            context,
+            PageTransition(
+              curve: Curves.linear,
+              type: PageTransitionType.rightToLeft,
+              child: AddPersonaDetails(isRought: false, isback: false),
+            ),
+          );
+        }
+        _timer?.cancel();
         if (mounted) {
           setState(() {
             isLoading2 = false;
           });
         }
-        return;
-      }
-      
-      // 正常模式：调用后端 API
-      try {
-        var uri = Uri.parse(apiHelper.verifyOtpPhone);
-        var request = http.MultipartRequest("POST", uri);
-        Map<String, String> headers = {
-          "Accept": "application/json",
-        };
-        request.headers.addAll(headers);
-
-        request.fields['country_code'] = widget.selectedCountry!;
-        request.fields['phone_number'] = widget.phoneController;
-        request.fields['otp'] = _codeController.text;
-        request.fields['device_token'] = _fcmtoken;
-        request.fields['one_signal_player_id'] =
-            OneSignal.User.pushSubscription.id!;
-
-        var response = await request.send();
-        print(response.statusCode);
-
-        String responseData =
-            await response.stream.transform(utf8.decoder).join();
-        var userData = json.decode(responseData);
-        send = VerifyOTPModel.fromJson(userData);
-        log('otp check response : $responseData');
-        if (send!.success == true) {
-          // 强制使用pawanTOKEN，不管后端返回什么
-          await Hive.box(userdata).put(authToken, pawanTOKEN);
-          await Hive.box(userdata)
-              .put(userName, send!.resData!.userName.toString());
-          await Hive.box(userdata)
-              .put(firstName, send!.resData!.firstName.toString());
-          await Hive.box(userdata)
-              .put(lastName, send!.resData!.lastName.toString());
-          await Hive.box(userdata)
-              .put(userImage, send!.resData!.profileImage.toString());
-          // Banner functionality removed
-          // Badge functionality removed
-          if (send!.resData!.gender != '') {
-            await Hive.box(userdata)
-                .put(userGender, send!.resData!.gender.toString());
-          }
-
-          if (send!.resData!.countryFullName != '') {
-            await Hive.box(userdata)
-                .put(userCountryName, send!.resData!.countryFullName.toString());
-          }
-
-          _timer?.cancel();
-          isLoading2 = false;
-          Navigator.of(context, rootNavigator: true).pop();
-          _setDataToHive(send!);
-
-          if (Hive.box(userdata).get(authToken) != null &&
-              Hive.box(userdata).get(lastName) != null &&
-              Hive.box(userdata).get(lastName)!.isNotEmpty &&
-              Hive.box(userdata).get(firstName) != null &&
-              Hive.box(userdata).get(firstName)!.isNotEmpty) {
-            print("☺☺☺☺GO TO HOME PAGE☺☺☺☺");
-            Get.offAll(TabbarScreen(
-              currentTab: 0,
-            ));
-          } else {
-            Navigator.pushReplacement(
-              context,
-              PageTransition(
-                curve: Curves.linear,
-                type: PageTransitionType.rightToLeft,
-                child: AddPersonaDetails(isRought: false, isback: false),
-              ),
-            );
-          }
-          _timer?.cancel();
-          if (mounted) {
-            setState(() {
-              isLoading2 = false;
-            });
-          }
-        } else {
-          setState(() {
-            isLoading2 = false;
-          });
-
-          showCustomToast(languageController.textTranslate('CANNOT VERIFY OTP'));
-        }
-      } catch (e) {
+      } else {
         setState(() {
           isLoading2 = false;
         });
-        print("API Error: $e");
+
         showCustomToast(languageController.textTranslate('CANNOT VERIFY OTP'));
       }
     } else {
@@ -837,100 +725,6 @@ class _otpState extends State<otp> {
         isLoding = false;
       });
     }
-  }
-
-  // 在后端创建用户并获取真实token
-  Future<void> _createUserInBackend() async {
-    try {
-      print("Creating user in backend for phone: ${widget.phoneController}");
-      
-      // 先尝试注册用户
-      var registerUri = Uri.parse(apiHelper.registerPhone);
-      var registerRequest = http.MultipartRequest("POST", registerUri);
-      Map<String, String> headers = {
-        "Accept": "application/json",
-      };
-      registerRequest.headers.addAll(headers);
-      registerRequest.fields['country_code'] = widget.selectedCountry!;
-      registerRequest.fields['phone_number'] = widget.phoneController;
-      registerRequest.fields['country'] = widget.countryName ?? 'US';
-      registerRequest.fields['country_full_name'] = widget.countryName ?? 'United States';
-
-      var registerResponse = await registerRequest.send();
-      print("Register response status: ${registerResponse.statusCode}");
-      
-      // 然后尝试验证OTP（使用123456）
-      var verifyUri = Uri.parse(apiHelper.verifyOtpPhone);
-      var verifyRequest = http.MultipartRequest("POST", verifyUri);
-      verifyRequest.headers.addAll(headers);
-      verifyRequest.fields['country_code'] = widget.selectedCountry!;
-      verifyRequest.fields['phone_number'] = widget.phoneController;
-      verifyRequest.fields['otp'] = "123456";
-      verifyRequest.fields['device_token'] = _fcmtoken;
-      verifyRequest.fields['one_signal_player_id'] = OneSignal.User.pushSubscription.id!;
-
-      var verifyResponse = await verifyRequest.send();
-      print("Verify response status: ${verifyResponse.statusCode}");
-      
-      String verifyResponseData = await verifyResponse.stream.transform(utf8.decoder).join();
-      var verifyUserData = json.decode(verifyResponseData);
-      var verifyResult = VerifyOTPModel.fromJson(verifyUserData);
-      
-      if (verifyResult.success == true) {
-        // 使用后端返回的真实token
-        await Hive.box(userdata).put(authToken, verifyResult.token.toString());
-        await Hive.box(userdata).put(userName, verifyResult.resData!.userName.toString());
-        await Hive.box(userdata).put(firstName, verifyResult.resData!.firstName.toString());
-        await Hive.box(userdata).put(lastName, verifyResult.resData!.lastName.toString());
-        await Hive.box(userdata).put(userImage, verifyResult.resData!.profileImage.toString());
-        await Hive.box(userdata).put(userGender, verifyResult.resData!.gender.toString());
-        await Hive.box(userdata).put(userCountryName, verifyResult.resData!.countryFullName.toString());
-        await Hive.box(userdata).put(userId, verifyResult.resData!.userId);
-        await Hive.box(userdata).put(userMobile, verifyResult.resData!.countryCode! + verifyResult.resData!.phoneNumber!);
-
-        _timer?.cancel();
-        isLoading2 = false;
-        Navigator.of(context, rootNavigator: true).pop();
-        _setDataToHive(verifyResult);
-
-        print("☺☺☺☺GO TO HOME PAGE (CREATED USER)☺☺☺☺");
-        Get.offAll(TabbarScreen(currentTab: 0));
-      } else {
-        // 如果后端创建失败，使用fallback方案
-        await _createFallbackUser();
-      }
-    } catch (e) {
-      print("Error creating user in backend: $e");
-      await _createFallbackUser();
-    }
-  }
-  
-  // 创建fallback用户（当后端创建失败时）
-  Future<void> _createFallbackUser() async {
-    print("Creating fallback user for phone: ${widget.phoneController}");
-    
-    // 生成基于手机号的唯一用户ID
-    int uniqueUserId = widget.phoneController.hashCode.abs();
-    String uniqueToken = pawanTOKEN;
-    
-    await Hive.box(userdata).put(authToken, uniqueToken);
-    await Hive.box(userdata).put(userName, "User_${widget.phoneController}");
-    await Hive.box(userdata).put(firstName, "User");
-    await Hive.box(userdata).put(lastName, widget.phoneController);
-    await Hive.box(userdata).put(userImage, "");
-    await Hive.box(userdata).put(userGender, "");
-    await Hive.box(userdata).put(userCountryName, widget.countryName);
-    await Hive.box(userdata).put(userId, uniqueUserId);
-    await Hive.box(userdata).put(userMobile, widget.selectedCountry! + widget.phoneController);
-
-    _timer?.cancel();
-    isLoading2 = false;
-    Navigator.of(context, rootNavigator: true).pop();
-    
-    await socketIntilized.initlizedsocket();
-
-    print("☺☺☺☺GO TO HOME PAGE (FALLBACK USER: $uniqueUserId)☺☺☺☺");
-    Get.offAll(TabbarScreen(currentTab: 0));
   }
 
   resendoTP() async {

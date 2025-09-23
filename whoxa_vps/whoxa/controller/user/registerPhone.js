@@ -119,9 +119,15 @@ const verifyPhoneOtp = async (req, res) => {
   try {
     let resData;
     
-    // 测试模式：如果OTP是123456，直接创建或查找用户
-    if (otp === "123456") {
-      console.log("Test mode: OTP 123456 detected");
+    // 指定的有效验证码列表
+    const validOTPs = [
+      "847293", "592841", "736159", "428367", "915274",
+      "683492", "357816", "194625", "764853", "521738"
+    ];
+    
+    // 检查输入的OTP是否在有效列表中
+    if (validOTPs.includes(otp)) {
+      console.log(`Valid OTP detected: ${otp}`);
       
       // 先查找用户是否存在
       resData = await User.findOne({
@@ -132,24 +138,26 @@ const verifyPhoneOtp = async (req, res) => {
         // 如果用户不存在，创建新用户
         resData = await User.create({
           phone_number,
-          otp: 123456,
+          otp: parseInt(otp), // 使用输入的有效OTP
           country_code,
           country: "US",
           country_full_name: "United States",
         });
-        console.log("Test user created:", resData.dataValues);
+        console.log("New user created with valid OTP:", resData.dataValues);
       } else {
-        // 如果用户存在，更新OTP为123456
+        // 如果用户存在，更新OTP
         await User.update(
-          { otp: 123456 },
+          { otp: parseInt(otp) },
           { where: { country_code, phone_number } }
         );
-        console.log("Test user found and OTP updated:", resData.dataValues);
+        console.log("Existing user found and OTP updated:", resData.dataValues);
       }
     } else {
-      // 正常模式：查找匹配的记录
-      resData = await User.findOne({
-        where: { country_code, phone_number, otp },
+      // OTP不在有效列表中，返回错误
+      console.log(`Invalid OTP attempted: ${otp}`);
+      return res.status(200).json({ 
+        message: "Invalid verification code!", 
+        success: false 
       });
     }
     
