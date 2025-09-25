@@ -42,30 +42,6 @@ class _WelcomeState extends State<Welcome> with TickerProviderStateMixin {
   void _initPermissionsList() {
     _permissions = [
       {
-        'permission': Permission.notification,
-        'title': 'Notifications',
-        'description': 'Stay updated with new messages and important alerts',
-        'icon': Icons.notifications_outlined,
-        'color': Color(0xFF4CAF50),
-        'benefit': 'Never miss a message from friends'
-      },
-      {
-        'permission': Permission.camera,
-        'title': 'Camera',
-        'description': 'Take photos and make video calls with friends',
-        'icon': Icons.camera_alt_outlined,
-        'color': Color(0xFF2196F3),
-        'benefit': 'Share moments instantly'
-      },
-      {
-        'permission': Permission.microphone,
-        'title': 'Microphone',
-        'description': 'Send voice messages and make audio calls',
-        'icon': Icons.mic_outlined,
-        'color': Color(0xFFFF9800),
-        'benefit': 'Express yourself with voice'
-      },
-      {
         'permission': Permission.contacts,
         'title': 'Contacts',
         'description': 'Find friends who are already using the app',
@@ -73,24 +49,26 @@ class _WelcomeState extends State<Welcome> with TickerProviderStateMixin {
         'color': Color(0xFF9C27B0),
         'benefit': 'Connect with existing friends'
       },
-      {
-        'permission': Permission.location,
-        'title': 'Location',
-        'description': 'Share your location and find nearby friends',
-        'icon': Icons.location_on_outlined,
-        'color': Color(0xFFE91E63),
-        'benefit': 'Share where you are'
-      },
     ];
 
+    // 添加相册权限 - 根据平台使用不同的权限
     if (Platform.isIOS) {
       _permissions.add({
         'permission': Permission.photos,
         'title': 'Photos',
-        'description': 'Share photos from your gallery with friends',
+        'description': 'Share photos from your gallery with friends and backup photos',
         'icon': Icons.photo_library_outlined,
         'color': Color(0xFF00BCD4),
         'benefit': 'Share your favorite memories'
+      });
+    } else {
+      _permissions.add({
+        'permission': Permission.storage,
+        'title': 'Storage',
+        'description': 'Access photos and files to share with friends and backup photos',
+        'icon': Icons.folder_outlined,
+        'color': Color(0xFF00BCD4),
+        'benefit': 'Share photos and files'
       });
     }
   }
@@ -156,7 +134,8 @@ class _WelcomeState extends State<Welcome> with TickerProviderStateMixin {
     try {
       if (Platform.isIOS) {
         var status = await Permission.photos.status;
-        return status.isGranted || status.isLimited;
+        // iOS端也要求完全授权，不接受受限权限
+        return status.isGranted;
       } else if (Platform.isAndroid) {
         var storageStatus = await Permission.storage.status;
         return storageStatus.isGranted;
@@ -174,7 +153,7 @@ class _WelcomeState extends State<Welcome> with TickerProviderStateMixin {
     for (var permissionData in _permissions) {
       final permission = permissionData['permission'] as Permission;
 
-      if (permission == Permission.photos) {
+      if (permission == Permission.photos || permission == Permission.storage) {
         final isPhotoGranted = await _checkPhotoPermission();
         _permissionsGranted[permission] = isPhotoGranted;
       } else {
@@ -248,15 +227,16 @@ class _WelcomeState extends State<Welcome> with TickerProviderStateMixin {
         continue;
       }
 
-      // Special handling for photos permission
-      if (permission == Permission.photos && Platform.isIOS) {
+      // Special handling for photo/storage permissions
+      if ((permission == Permission.photos && Platform.isIOS) || 
+          (permission == Permission.storage && Platform.isAndroid)) {
         final isPhotoGranted = await _checkPhotoPermission();
         if (isPhotoGranted) {
           _permissionsGranted[permission] = true;
           continue;
         }
 
-        final newStatus = await Permission.photos.request();
+        final newStatus = await permission.request();
         final newIsGranted = await _checkPhotoPermission();
         _permissionsGranted[permission] = newIsGranted;
       } else {
