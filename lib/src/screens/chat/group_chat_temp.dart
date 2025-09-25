@@ -2088,7 +2088,7 @@ class _GroupChatMsgState extends State<GroupChatMsg> {
     return Text(
       capitalizedMessage,
       style: TextStyle(
-        fontSize: isEmoji ? 50 : 14, // Increase size for emoji-only messages
+        fontSize: 14, // 表情和文字消息都使用14px，保持一致
         fontWeight: FontWeight.w400,
         color: !isMyMessage ? appColorWhite : chatColor,
       ),
