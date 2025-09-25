@@ -112,6 +112,10 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
   bool _isCameraPermissionGranted = false;
   bool _isLocationPermissionGranted = false;
   bool isNavigating = false;
+  
+  // 联系人备注相关
+  String contactNote = '';
+  TextEditingController noteController = TextEditingController();
 
   //pinned message
   PinMessageController pinMessageController = Get.put(PinMessageController());
@@ -135,6 +139,7 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
     apis();
     audioPlayer = AudioPlayer();
     audioRecord = Record();
+    _loadContactNote(); // 加载联系人备注
     super.initState();
     
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -555,10 +560,12 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
                       chatContorller.userdetailschattModel.value == null
                   ? Container(
                       decoration: const BoxDecoration(
+                        color: Colors.black12, // 添加基础黑色背景
                         image: DecorationImage(
-                          opacity: 0.05,
+                          opacity: 0.8,
                           image: AssetImage("assets/images/chat_back_img.png"),
                           fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken), // 增强黑色效果
                         ),
                       ),
                       child: loader(context))
@@ -567,11 +574,13 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
                         Flexible(
                           child: Container(
                             decoration: const BoxDecoration(
+                              color: Colors.black12, // 添加基础黑色背景
                               image: DecorationImage(
-                                opacity: 0.05,
+                                opacity: 0.8,
                                 image: AssetImage(
                                     "assets/images/chat_back_img.png"),
                                 fit: BoxFit.cover,
+                                colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken), // 增强黑色效果
                               ),
                             ),
                             child: Stack(
@@ -3007,11 +3016,11 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
 
     final capitalizedMessage = capitalizeFirstLetter(message);
     final isEmoji = isOnlyEmoji(message);
-
+    
     return Text(
       capitalizedMessage,
       style: TextStyle(
-        fontSize: isEmoji ? 50 : 14, // Increase size for emoji-only messages
+        fontSize: 14, // 表情和文字消息都使用14px，保持一致
         fontWeight: FontWeight.w400,
         color: !isMyMessage ? appColorWhite : chatColor,
       ),
@@ -8488,21 +8497,50 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
                     // ),
                     Container(
                       width: MediaQuery.of(context).size.width * 0.40,
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              capitalizeFirstLetter(widget.username!),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  capitalizeFirstLetter(widget.username!),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: chatColor,
+                                    fontWeight: FontWeight.w500,
+                                    overflow: TextOverflow.ellipsis,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              // 备注编辑按钮
+                              InkWell(
+                                onTap: () => _showNoteEditDialog(context),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.edit_note,
+                                    size: 16,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // 显示备注（如果有）
+                          if (contactNote.isNotEmpty)
+                            Text(
+                              contactNote,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: chatColor,
-                                fontWeight: FontWeight.w500,
-                                overflow: TextOverflow.ellipsis,
-                                fontSize: 14,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -9316,6 +9354,84 @@ class _SingleChatMsgState extends State<SingleChatMsg> {
   }
 
   //pinned message dialog
+  
+  // 显示备注编辑对话框
+  void _showNoteEditDialog(BuildContext context) {
+    noteController.text = contactNote;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('编辑联系人备注'),
+          content: TextField(
+            controller: noteController,
+            decoration: InputDecoration(
+              hintText: '输入备注信息...',
+              border: OutlineInputBorder(),
+            ),
+            maxLength: 50,
+            maxLines: 2,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () {
+                _saveContactNote();
+                Navigator.of(context).pop();
+              },
+              child: Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 保存联系人备注
+  void _saveContactNote() {
+    setState(() {
+      contactNote = noteController.text.trim();
+    });
+    
+    // 保存到本地存储
+    _saveNoteToLocal();
+    
+    // 显示保存成功提示
+    if (contactNote.isNotEmpty) {
+      showCustomToast('备注已保存');
+    } else {
+      showCustomToast('备注已清除');
+    }
+  }
+
+  // 保存备注到本地存储
+  void _saveNoteToLocal() {
+    final box = Hive.box(userdata);
+    final noteKey = 'contact_note_${widget.userID}';
+    
+    if (contactNote.isNotEmpty) {
+      box.put(noteKey, contactNote);
+    } else {
+      box.delete(noteKey);
+    }
+  }
+
+  // 从本地存储加载备注
+  void _loadContactNote() {
+    final box = Hive.box(userdata);
+    final noteKey = 'contact_note_${widget.userID}';
+    final savedNote = box.get(noteKey, defaultValue: '');
+    
+    setState(() {
+      contactNote = savedNote ?? '';
+    });
+  }
 }
 
 List _searchResult = [];
